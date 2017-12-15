@@ -92,6 +92,7 @@ if(jagg.isCSRFTokenValid())
                 }
             }
             else if(type == "soap"){
+                var provider = jagg.module("manager").getAPIProviderObj();
                 var url = request.getParameter("wsdl-url");
                 var file = request.getFile("wsdl-file");
                 var import_type = request.getParameter("import-definition");
@@ -101,6 +102,19 @@ if(jagg.isCSRFTokenValid())
                 }
                 var obj = loadSwaggerObj("/site/conf/soap_swagger.json");
                 swagger = stringify(obj);
+                var resp;
+                try {
+                    resp = provider.convertSoapToRest(url);
+                    log.info(resp);
+                    if(resp) {
+                        session.put("conversionObj", resp);
+                        log.info("soap to rest conversion successful.")
+                    } else {
+                        log.error("error occurred while soap to rest conversion.")
+                    }
+                } catch (e) {
+                    log.error(e);
+                }
             }else if(type=="ws"){
                 session.put("wsdl",null);
                 session.put("swagger",null);

@@ -1332,4 +1332,8 @@ public final class APIConstants {
 
     public static final String UN_AUTHORIZED_ERROR_MESSAGE = "User is not authorized to";
 
+    public static class WSDLConstants {
+        public static final String WSDL_VERSION_11 = "1.1";
+    }
+
 }

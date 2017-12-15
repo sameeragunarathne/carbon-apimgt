@@ -1151,6 +1151,19 @@ public class APIProviderHostObject extends ScriptableObject {
         return success;
     }
 
+    public static String jsFunction_convertSoapToRest(Context cx, Scriptable thisObj, Object[] args, Function funObj)
+            throws APIManagementException {
+        String url = (String) args[0];
+        String resp = null;
+        try {
+            resp = APIUtil.soapToRestMapping(url);
+        } catch (APIManagementException e) {
+            String msg = "Error occurred while soap to rest conversion for wsdl url: " + url;
+            handleException(msg, e);
+        }
+        return resp;
+    }
+
     /**
      * This method is to functionality of add a new API in API-Provider
      *

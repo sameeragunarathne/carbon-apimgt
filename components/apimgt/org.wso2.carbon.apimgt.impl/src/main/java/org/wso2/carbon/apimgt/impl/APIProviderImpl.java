@@ -93,6 +93,7 @@ import org.wso2.carbon.apimgt.impl.template.APITemplateBuilderImpl;
 import org.wso2.carbon.apimgt.impl.template.APITemplateException;
 import org.wso2.carbon.apimgt.impl.template.ThrottlePolicyTemplateBuilder;
 import org.wso2.carbon.apimgt.impl.utils.APIAuthenticationAdminClient;
+import org.wso2.carbon.apimgt.impl.utils.APIMWSDLReader;
 import org.wso2.carbon.apimgt.impl.utils.APINameComparator;
 import org.wso2.carbon.apimgt.impl.utils.APIStoreNameComparator;
 import org.wso2.carbon.apimgt.impl.utils.APIUtil;
@@ -692,6 +693,7 @@ class APIProviderImpl extends AbstractAPIManager implements APIProvider {
         }
     }
 
+
     /**
      * Validates the name and version of api against illegal characters.
      *
@@ -759,7 +761,19 @@ class APIProviderImpl extends AbstractAPIManager implements APIProvider {
         return defaultVersion;
     }
 
-
+    @Override
+    public void soapToRestMapping(String url) throws APIManagementException {
+        APIMWSDLReader wsdlReader = new APIMWSDLReader(url);
+        byte[] wsdlContent = wsdlReader.getWSDL();
+        WSDLProcessor processor = wsdlReader.getWSDLProcessor(wsdlContent);
+        Set<WSDLSoapOperation> operations = null;
+        try {
+            operations = processor.getWsdlInfo().getSoapBindingOperations();
+        } catch (APIMgtWSDLException e) {
+            throw new APIManagementException("Error in soap to rest conversion for wsdl url:" + url, e);
+        }
+        APIUtil.mapSoapToRest(operations);
+    }
 
     public String getPublishedDefaultVersion(APIIdentifier apiid) throws APIManagementException{
 
@@ -794,6 +808,23 @@ class APIProviderImpl extends AbstractAPIManager implements APIProvider {
             String artifactPath = GovernanceUtils.getArtifactPath(registry, apiArtifact.getId());
             if (APIUtil.isValidWSDLURL(api.getWsdlUrl(), false)) {
                 String path = APIUtil.createWSDL(registry, api);
+                String resourcePath = APIUtil.getSwagger20DefinitionFilePath(api.getId().getApiName(),
+                        api.getId().getVersion(),
+                        api.getId().getProviderName());
+                if (registry.resourceExists(resourcePath + APIConstants.API_DOC_2_0_RESOURCE_NAME)) {
+                    JSONObject swaggerObject = (JSONObject) new JSONParser()
+                            .parse(definitionFromSwagger20.getAPIDefinition(api.getId(), registry));
+                    JSONObject infoObject = (JSONObject) swaggerObject.get("info");
+                    JSONObject pathObject = (JSONObject) swaggerObject.get("paths");
+                    Set keys = pathObject.keySet();
+                    Iterator iterator = keys.iterator();
+
+                    while (iterator.hasNext()) {
+                        String key = (String) iterator.next();
+                        pathObject.get(key);
+                    }
+                    //definitionFromSwagger20.saveAPIDefinition(api, swaggerObject.toJSONString(), registry);
+                }
                 if (path != null) {
                     registry.addAssociation(artifactPath, path, CommonConstants.ASSOCIATION_TYPE01);
                     apiArtifact.setAttribute(APIConstants.API_OVERVIEW_WSDL, api.getWsdlUrl()); //reset the wsdl path
@@ -809,6 +840,10 @@ class APIProviderImpl extends AbstractAPIManager implements APIProvider {
                 handleException("Error occurred while rolling back the transaction.", ex);
             }
             throw new APIManagementException("Error occurred while saving the wsdl in the registry.", e);
+        } catch (ParseException e) {
+                    String msg = "Couldn't Create json Object from Swagger object for version" + api.getId().getVersion() + " of : " +
+                            api.getId().getApiName();
+                    handleException(msg, e);
         } finally {
             try {
                 if (!transactionCommitted) {
@@ -2456,6 +2491,7 @@ class APIProviderImpl extends AbstractAPIManager implements APIProvider {
             }
             if (APIUtil.isValidWSDLURL(api.getWsdlUrl(), false)) {
                 String path = APIUtil.createWSDL(registry, api);
+
                 if (path != null) {
                     registry.addAssociation(artifactPath, path, CommonConstants.ASSOCIATION_TYPE01);
                     artifact.setAttribute(APIConstants.API_OVERVIEW_WSDL, api.getWsdlUrl()); //reset the wsdl path to permlink
@@ -3940,7 +3976,7 @@ class APIProviderImpl extends AbstractAPIManager implements APIProvider {
      * Returns the all the Consumer keys of applications which are subscribed to the given API
      *
      * @param apiIdentifier APIIdentifier
-     * @return a String array of ConsumerKeys
+     * @return a String array of ConsumerKeysapiDefinitionJSON
      * @throws APIManagementException
      */
     public String[] getConsumerKeys(APIIdentifier apiIdentifier) throws APIManagementException {

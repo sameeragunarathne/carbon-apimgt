@@ -1106,6 +1106,21 @@ $('#go_to_implement').click(function(e){
     thisID = $(this).attr('id');
 });
 
+$('#rest-gen').click(function(){
+    if ($(this).is(':checked')) {
+        getSoapToRestPathMap();
+        $("#wsdl-content").hide();
+        $(".resource_create").hide();
+        $('#resource_details').show();
+    }
+});
+
+$('#pass-thru').click(function(){
+    if ($(this).is(':checked')) {
+        $("#resource_details").hide();
+        $('#wsdl-content').show();
+    }
+});
 
 
 function getContextValue() {
@@ -1221,3 +1236,34 @@ var disableForm = function(){
 
 }
 
+
+var getSoapToRestPathMap = function () {
+    var mappingStr = $('#conversion-obj').val();
+    var mappingJson = JSON.parse(mappingStr);
+    var names={},parameters=[];
+
+    $.each(mappingJson, function(key, value) {
+        var responses = {},verb={},status={},description={};
+        var httpverb = value.httpVerb.toLowerCase();
+        var path = "/"+value.name;
+        description["description"] = "";
+        status["200"] = description;
+        responses["responses"]=status;
+        responses.parameters = [];
+
+        $.each(value.parameters, function(key, value) {
+            var parameter={};
+            parameter.description = "";
+            parameter.in = "query";
+            parameter.name = value.name;
+            parameter.type = value.dataType;
+            parameters.push(parameter);
+            responses.parameters.push(parameter);
+        });
+        verb[httpverb]=responses;
+        names[path]=verb;
+    });
+    api_doc.paths = names;
+    var designer = new APIDesigner();
+    designer.load_api_document(api_doc);
+};

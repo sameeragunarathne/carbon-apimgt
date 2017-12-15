@@ -34,6 +34,9 @@ import org.w3c.dom.Element;
 import org.wso2.carbon.apimgt.api.APIManagementException;
 import org.wso2.carbon.apimgt.api.model.API;
 import org.wso2.carbon.apimgt.impl.APIConstants;
+import org.wso2.carbon.apimgt.impl.APIMgtWSDLException;
+import org.wso2.carbon.apimgt.impl.WSDLProcessor;
+import org.wso2.carbon.apimgt.impl.WSDLProcessorImpl;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
@@ -111,20 +114,13 @@ public class APIMWSDLReader {
 
 		try {
 			Definition wsdlDefinition = readWSDLFile();
-
 			setServiceDefinition(wsdlDefinition, api);
-
 			WSDLWriter writer = getWsdlFactoryInstance().newWSDLWriter();
-
 			ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-
 			writer.writeWSDL(wsdlDefinition, byteArrayOutputStream);
-
 			ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream( byteArrayOutputStream.toByteArray());
 
 			return APIUtil.buildOMElement(byteArrayInputStream);
-
-
 		} catch (Exception e) {
 			String msg = " Error occurs when change the addres URL of the WSDL";
 			log.error(msg);
@@ -149,6 +145,78 @@ public class APIMWSDLReader {
             throw new APIManagementException(msg, e);
         }
 
+    }
+
+    /**
+     * Retrieves the WSDL located in the provided URI ({@code api}
+     * @param api api object
+     * @return Content bytes of the WSDL file
+     * @throws APIManagementException If an error occurred while retrieving the WSDL file
+     */
+    public byte[] getWSDL(API api) throws APIManagementException {
+        try {
+            Definition wsdlDefinition = readWSDLFile();
+            setServiceDefinition(wsdlDefinition, api);
+            WSDLWriter writer = getWsdlFactoryInstance().newWSDLWriter();
+            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+            writer.writeWSDL(wsdlDefinition, byteArrayOutputStream);
+            return byteArrayOutputStream.toByteArray();
+        } catch (Exception e) {
+            String msg = " Error occurs when change the addres URL of the WSDL";
+            log.error(msg);
+            throw new APIManagementException(msg, e);
+        }
+    }
+
+    public byte[] getWSDL() throws APIManagementException {
+        try {
+            Definition wsdlDefinition = readWSDLFile();
+            WSDLWriter writer = getWsdlFactoryInstance().newWSDLWriter();
+            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+            writer.writeWSDL(wsdlDefinition, byteArrayOutputStream);
+            return byteArrayOutputStream.toByteArray();
+        } catch (Exception e) {
+            String msg = " Error occurs when change the addres URL of the WSDL";
+            log.error(msg);
+            throw new APIManagementException(msg, e);
+        }
+    }
+
+    /**
+     * Retrieves the WSDL located in the provided URI ({@code api}
+     * @param api api object
+     * @return Content bytes of the WSDL file
+     * @throws APIManagementException If an error occurred while retrieving the WSDL file
+     */
+    public byte[] getWSDL2(API api) throws APIManagementException {
+        try {
+            org.apache.woden.wsdl20.Description wsdlDefinition = readWSDL2File();
+            setServiceDefinitionForWSDL2(wsdlDefinition, api);
+            org.apache.woden.WSDLWriter writer = org.apache.woden.WSDLFactory.newInstance().newWSDLWriter();
+            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+            writer.writeWSDL(wsdlDefinition.toElement(), byteArrayOutputStream);
+            return byteArrayOutputStream.toByteArray();
+        } catch (Exception e) {
+            String msg = " Error occurs when change the addres URL of the WSDL";
+            log.error(msg);
+            throw new APIManagementException(msg, e);
+        }
+    }
+
+    public WSDLProcessor getWSDLProcessor(byte[] content) throws APIManagementException {
+        WSDLProcessor processor = new WSDLProcessorImpl();
+        try {
+            boolean canProcess = processor.init(content);
+            if(canProcess) {
+                return processor;
+            }
+        } catch (APIMgtWSDLException e) {
+            String msg = "error while instantiating wsdl processor class";
+            throw new APIManagementException(msg, e);
+        }
+
+        //no processors found if this line reaches
+        throw new APIManagementException("No WSDL processor found to process WSDL content");
     }
 
     /**
