@@ -16,7 +16,7 @@
  * under the License.
  */
 
-package org.wso2.carbon.apimgt.impl;
+package org.wso2.carbon.apimgt.impl.soaptorest.model;
 
 import java.util.List;
 import java.util.Objects;

@@ -34,10 +34,9 @@ import org.w3c.dom.Element;
 import org.wso2.carbon.apimgt.api.APIManagementException;
 import org.wso2.carbon.apimgt.api.model.API;
 import org.wso2.carbon.apimgt.impl.APIConstants;
-import org.wso2.carbon.apimgt.impl.APIMgtWSDLException;
-import org.wso2.carbon.apimgt.impl.WSDLProcessor;
-import org.wso2.carbon.apimgt.impl.WSDLProcessorImpl;
-import org.xml.sax.InputSource;
+import org.wso2.carbon.apimgt.impl.soaptorest.exceptions.APIMgtWSDLException;
+import org.wso2.carbon.apimgt.impl.soaptorest.WSDLProcessor;
+import org.wso2.carbon.apimgt.impl.soaptorest.WSDLSOAPOperationMapper;
 import org.xml.sax.SAXException;
 
 import javax.wsdl.Definition;
@@ -60,7 +59,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.util.Iterator;
@@ -204,15 +202,14 @@ public class APIMWSDLReader {
     }
 
     public WSDLProcessor getWSDLProcessor(byte[] content) throws APIManagementException {
-        WSDLProcessor processor = new WSDLProcessorImpl();
+        WSDLProcessor processor = new WSDLSOAPOperationMapper();
         try {
             boolean canProcess = processor.init(content);
             if(canProcess) {
                 return processor;
             }
         } catch (APIMgtWSDLException e) {
-            String msg = "error while instantiating wsdl processor class";
-            throw new APIManagementException(msg, e);
+            throw new APIManagementException("Error while instantiating wsdl processor class", e);
         }
 
         //no processors found if this line reaches

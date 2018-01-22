@@ -16,7 +16,7 @@
  * under the License.
  */
 
-package org.wso2.carbon.apimgt.impl;
+package org.wso2.carbon.apimgt.impl.soaptorest.exceptions;
 
 /**
  * This is the custom exception class to be thrown when an issue encountered in WSDL related operations 

@@ -93,7 +93,6 @@ import org.wso2.carbon.apimgt.impl.template.APITemplateBuilderImpl;
 import org.wso2.carbon.apimgt.impl.template.APITemplateException;
 import org.wso2.carbon.apimgt.impl.template.ThrottlePolicyTemplateBuilder;
 import org.wso2.carbon.apimgt.impl.utils.APIAuthenticationAdminClient;
-import org.wso2.carbon.apimgt.impl.utils.APIMWSDLReader;
 import org.wso2.carbon.apimgt.impl.utils.APINameComparator;
 import org.wso2.carbon.apimgt.impl.utils.APIStoreNameComparator;
 import org.wso2.carbon.apimgt.impl.utils.APIUtil;
@@ -139,6 +138,10 @@ import org.wso2.carbon.utils.CarbonUtils;
 import org.wso2.carbon.utils.multitenancy.MultitenantConstants;
 import org.wso2.carbon.utils.multitenancy.MultitenantUtils;
 
+import javax.cache.Cache;
+import javax.cache.Caching;
+import javax.xml.namespace.QName;
+import javax.xml.stream.XMLStreamException;
 import java.io.File;
 import java.io.InputStream;
 import java.nio.charset.Charset;
@@ -160,11 +163,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import javax.cache.Cache;
-import javax.cache.Caching;
-import javax.xml.namespace.QName;
-import javax.xml.stream.XMLStreamException;
 
 import static org.wso2.carbon.apimgt.impl.utils.APIUtil.isAllowDisplayAPIsWithMultipleStatus;
 
@@ -759,20 +757,6 @@ class APIProviderImpl extends AbstractAPIManager implements APIProvider {
             handleException("Error while getting default version :" + apiid.getApiName(), e);
         }
         return defaultVersion;
-    }
-
-    @Override
-    public void soapToRestMapping(String url) throws APIManagementException {
-        APIMWSDLReader wsdlReader = new APIMWSDLReader(url);
-        byte[] wsdlContent = wsdlReader.getWSDL();
-        WSDLProcessor processor = wsdlReader.getWSDLProcessor(wsdlContent);
-        Set<WSDLSoapOperation> operations = null;
-        try {
-            operations = processor.getWsdlInfo().getSoapBindingOperations();
-        } catch (APIMgtWSDLException e) {
-            throw new APIManagementException("Error in soap to rest conversion for wsdl url:" + url, e);
-        }
-        APIUtil.mapSoapToRest(operations);
     }
 
     public String getPublishedDefaultVersion(APIIdentifier apiid) throws APIManagementException{

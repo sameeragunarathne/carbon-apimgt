@@ -5,6 +5,8 @@ var encode = require('encode');
 encode = new encode.Encode();
 var CryptoUtil = Packages.org.wso2.carbon.core.util.CryptoUtil;
 
+var mappingJson;
+
 function loadSwaggerObj(path)
 {
     var obj, file = new File(path);
@@ -96,6 +98,8 @@ if(jagg.isCSRFTokenValid())
                 var url = request.getParameter("wsdl-url");
                 var file = request.getFile("wsdl-file");
                 var import_type = request.getParameter("import-definition");
+                var passThrough = request.getParameter("soap-options-pass-thru");
+                var rest = request.getParameter("soap-options-rest");
                 wsdl = "soap";
                 if(url){
                     wsdl = url.trim();
@@ -104,13 +108,94 @@ if(jagg.isCSRFTokenValid())
                 swagger = stringify(obj);
                 var resp;
                 try {
-                    resp = provider.convertSoapToRest(url);
-                    log.info(resp);
-                    if(resp) {
-                        session.put("conversionObj", resp);
-                        log.info("soap to rest conversion successful.")
+                    if(rest) {
+                        resp = provider.convertSoapToRest(url);
+                        if(resp) {
+                            mappingJson = parse(resp);
+                            session.put("mappingJson", mappingJson);
+                            //log.info(mappingJson);
+                            var names={},parameters=[];
+                            var definitions = {};
+                            for(var i=0; i < mappingJson.length; i++) {
+                                var responses = {},verb={},status={},description={},definition={};
+                                var httpverb = mappingJson[i].httpVerb.toLowerCase();
+                                var path = "/"+mappingJson[i].name;
+                                description["description"] = "";
+                                status["200"] = description;
+                                responses.tags = [];
+                                responses.parameters = [];
+                                responses["responses"]=status;
+                                responses.tags.push(mappingJson[i].name);
+                                var count = 0;
+                                var properties = {};
+                                for(var j=0; j < mappingJson[i].parameters.length; j++) {
+                                    var parameter={};
+                                    parameter.description = "";
+                                    var type = mappingJson[i].parameters[j].dataType;
+                                    if(mappingJson[i].parameters[j].isComplexType) {
+                                        if(count == 0) {
+                                            parameter.in = "body";
+                                            parameter.name = "Payload";
+                                            var def = "#/definitions/" + mappingJson[i].parameters[j].name;
+                                            var ref = {}, typeObj = {};
+                                            ref["$ref"] = def;
+                                            typeObj["type"] = "object";
+                                            parameter.schema = ref;
+                                            definitions[mappingJson[i].parameters[j].name] = typeObj;
+                                        }
+                                        var property = {};
+                                        property.type = type;
+                                        if(type === "ArrayOfString") {
+                                            property.type = "array";
+                                            var itemType = {};
+                                            itemType["type"] = "string";
+                                            property.items = itemType;
+                                            properties[mappingJson[i].parameters[j].name] = property;
+                                        } else {
+                                            var defNew = "#/definitions/" + mappingJson[i].parameters[j].name;
+                                            var refNew = {}, typeObjNew = {}, propertiesNew = {};
+                                            refNew["$ref"] = defNew;
+                                            typeObjNew["type"] = "object";
+                                            properties[mappingJson[i].parameters[j].name] = refNew;
+                                            for(var k = 0; k < mappingJson[i].parameters[j].wsdlComplexType.paramList.length; k++) {
+                                                if(!mappingJson[i].parameters[j].wsdlComplexType.paramList[k].dataType) {
+                                                    var defComplex = "#/definitions/" + mappingJson[i].parameters[j].wsdlComplexType.paramList[k].name;
+                                                    var refComplex = {}, typeObjComplex = {}, propertiesComplex = {};
+                                                    refComplex["$ref"] = defComplex;
+                                                    typeObjComplex["type"] = "object";
+                                                    propertiesNew[mappingJson[i].parameters[j].wsdlComplexType.paramList[k].name] = refComplex;
+                                                } else {
+                                                    property.type = mappingJson[i].parameters[j].wsdlComplexType.paramList[k].dataType;
+                                                    propertiesNew[mappingJson[i].parameters[j].wsdlComplexType.paramList[k].name] = property;
+                                                }
+                                            }
+
+                                            definitions[mappingJson[i].parameters[j].name] = typeObjNew;
+                                            definitions[mappingJson[i].parameters[j].name].properties = propertiesNew;
+                                        }
+                                        definitions[mappingJson[i].parameters[j].name].properties = properties;
+                                        count++;
+                                    } else {
+                                        parameter.in = "query";
+                                        parameter.name = mappingJson[i].parameters[j].name;
+                                        parameter.type = type;
+                                    }
+
+                                    if(parameter.in) {
+                                        parameters.push(parameter);
+                                        responses.parameters.push(parameter);
+                                    }
+                                }
+                                verb[httpverb]=responses;
+                                names[path]=verb;
+                            }
+                            session.put("paths", names);
+                            session.put("definitions", definitions);
+                        } else {
+                            log.error("error occurred while soap to rest conversion.")
+                        }
                     } else {
-                        log.error("error occurred while soap to rest conversion.")
+                        session.remove("paths");
                     }
                 } catch (e) {
                     log.error(e);
@@ -205,8 +290,13 @@ if(jagg.isCSRFTokenValid())
 
             apiData.swagger = request.getParameter("swagger", "UTF-8");
 
+            var provider = jagg.module("manager").getAPIProviderObj();
             result = mod.updateAPIDesign(apiData);
-            if (result.error==true) {
+            mappingJson = session.get("mappingJson");
+            provider.saveRestToSoapConvertedSequence(apiData, mappingJson, stringify(mappingJson));
+            log.info(apiData);
+            //provider.getRestToSoapConvertedSequence(apiData);
+            if (result.error == true) {
                 obj = {
                     error:true,
                     message:result.message

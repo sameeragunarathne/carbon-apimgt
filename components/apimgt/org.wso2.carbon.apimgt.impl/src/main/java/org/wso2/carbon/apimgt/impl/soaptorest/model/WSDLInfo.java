@@ -16,7 +16,7 @@
  * under the License.
  */
 
-package org.wso2.carbon.apimgt.impl;
+package org.wso2.carbon.apimgt.impl.soaptorest.model;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -32,7 +32,7 @@ public class WSDLInfo {
     private boolean hasSoapBindingOperations;
     private boolean hasHttpBindingOperations;
     private Set<WSDLOperation> httpBindingOperations;
-    private Set<WSDLSoapOperation> soapBindingOperations;
+    private Set<WSDLSOAPOperation> soapBindingOperations;
 
     public WSDLInfo() {
         endpoints = new HashMap<>();
@@ -78,11 +78,11 @@ public class WSDLInfo {
         this.httpBindingOperations = operations;
     }
 
-    public Set<WSDLSoapOperation> getSoapBindingOperations() {
+    public Set<WSDLSOAPOperation> getSoapBindingOperations() {
         return soapBindingOperations;
     }
 
-    public void setSoapBindingOperations(Set<WSDLSoapOperation> soapBindingOperations) {
+    public void setSoapBindingOperations(Set<WSDLSOAPOperation> soapBindingOperations) {
         this.soapBindingOperations = soapBindingOperations;
     }
 }

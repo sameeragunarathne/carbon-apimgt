@@ -18,6 +18,11 @@
 
 package org.wso2.carbon.apimgt.hostobjects;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.type.TypeFactory;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
 import io.swagger.models.Operation;
 import io.swagger.models.Path;
 import io.swagger.models.Swagger;
@@ -42,7 +47,6 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpHead;
 import org.apache.http.conn.params.ConnRoutePNames;
 import org.apache.http.entity.mime.content.FileBody;
-import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.jaggeryjs.hostobjects.file.FileHostObject;
 import org.jaggeryjs.scriptengine.exceptions.ScriptException;
@@ -87,6 +91,10 @@ import org.wso2.carbon.apimgt.hostobjects.util.Json;
 import org.wso2.carbon.apimgt.impl.APIConstants;
 import org.wso2.carbon.apimgt.impl.APIManagerConfiguration;
 import org.wso2.carbon.apimgt.impl.APIManagerFactory;
+import org.wso2.carbon.apimgt.impl.soaptorest.model.WSDLComplexType;
+import org.wso2.carbon.apimgt.impl.soaptorest.model.WSDLOperationParam;
+import org.wso2.carbon.apimgt.impl.soaptorest.model.WSDLSOAPOperation;
+import org.wso2.carbon.apimgt.impl.soaptorest.template.RESTToSOAPMsgTemplate;
 import org.wso2.carbon.apimgt.impl.UserAwareAPIProvider;
 import org.wso2.carbon.apimgt.impl.certificatemgt.CertificateManager;
 import org.wso2.carbon.apimgt.impl.certificatemgt.CertificateManagerImpl;
@@ -96,7 +104,6 @@ import org.wso2.carbon.apimgt.impl.dto.Environment;
 import org.wso2.carbon.apimgt.impl.dto.TierPermissionDTO;
 import org.wso2.carbon.apimgt.impl.factory.KeyManagerHolder;
 import org.wso2.carbon.apimgt.impl.utils.APIAuthenticationAdminClient;
-import org.wso2.carbon.apimgt.impl.utils.APIMWSDLReader;
 import org.wso2.carbon.apimgt.impl.utils.APIMWSDLReader;
 import org.wso2.carbon.apimgt.impl.utils.APIUtil;
 import org.wso2.carbon.apimgt.impl.utils.APIVersionComparator;
@@ -108,6 +115,10 @@ import org.wso2.carbon.context.PrivilegedCarbonContext;
 import org.wso2.carbon.core.util.PermissionUpdateUtil;
 import org.wso2.carbon.governance.lcm.util.CommonUtil;
 import org.wso2.carbon.identity.oauth.OAuthAdminService;
+import org.wso2.carbon.registry.api.Resource;
+import org.wso2.carbon.registry.core.Collection;
+import org.wso2.carbon.registry.core.RegistryConstants;
+import org.wso2.carbon.registry.core.ResourceImpl;
 import org.wso2.carbon.registry.core.exceptions.RegistryException;
 import org.wso2.carbon.registry.core.service.RegistryService;
 import org.wso2.carbon.registry.core.session.UserRegistry;
@@ -123,6 +134,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -130,6 +142,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -151,6 +164,8 @@ public class APIProviderHostObject extends ScriptableObject {
     private static String ICON_PATH = "tmp/icon";
     private static final String ALIAS = "alias";
     private static final String END_POINT = "endpoint";
+
+    private static final String SOAP_TO_REST_RESOURCE = "soap_to_rest";
 
     private APIProvider apiProvider;
 
@@ -1151,18 +1166,363 @@ public class APIProviderHostObject extends ScriptableObject {
         return success;
     }
 
-    public static String jsFunction_convertSoapToRest(Context cx, Scriptable thisObj, Object[] args, Function funObj)
-            throws APIManagementException {
-        String url = (String) args[0];
-        String resp = null;
-        try {
-            resp = APIUtil.soapToRestMapping(url);
-        } catch (APIManagementException e) {
-            String msg = "Error occurred while soap to rest conversion for wsdl url: " + url;
-            handleException(msg, e);
-        }
-        return resp;
-    }
+//    /**
+//     * converts soap to rest mapping from the given wsdl url
+//     *
+//     * @param cx
+//     * @param thisObj
+//     * @param args
+//     * @param funObj
+//     * @return
+//     * @throws APIManagementException
+//     */
+//    public static String jsFunction_convertSoapToRest(Context cx, Scriptable thisObj, Object[] args, Function funObj)
+//            throws APIManagementException {
+//        String url = (String) args[0];
+//        String resp = null;
+//        try {
+//            resp = APIUtil.getSoapToRestMapping(url);
+//        } catch (APIManagementException e) {
+//            String msg = "Error occurred while soap to rest conversion for wsdl url: " + url;
+//            handleException(msg, e);
+//        }
+//        return resp;
+//    }
+
+//    /**
+//     * Saves rest to soap synapse sequence in the registry
+//     *
+//     * @param cx
+//     * @param thisObj
+//     * @param args
+//     * @param funObj
+//     * @throws APIManagementException
+//     */
+//    public static void jsFunction_saveRestToSoapConvertedSequence(Context cx, Scriptable thisObj, Object[] args, Function funObj)
+//            throws APIManagementException {
+//
+//        if (args == null || args.length == 0) {
+//            handleException("Invalid number of input parameters.");
+//        }
+//
+//        NativeObject apiData = (NativeObject) args[0];
+//        NativeArray mappingJsonArr = (NativeArray) args[1];
+//        String mappingJson = (String) args[2];
+//        String provider = String.valueOf(apiData.get("provider", apiData));
+//        String name = (String) apiData.get("apiName", apiData);
+//        String version = (String) apiData.get("version", apiData);
+//
+//        if (provider != null) {
+//            provider = APIUtil.replaceEmailDomain(provider);
+//        }
+//        provider = (provider != null ? provider.trim() : null);
+//        name = (name != null ? name.trim() : null);
+//        version = (version != null ? version.trim() : null);
+//        APIIdentifier apiId = new APIIdentifier(provider, name, version);
+//        APIProvider apiProvider = getAPIProvider(thisObj);
+//        if (apiProvider.getAPI(apiId) == null) {
+//            return;
+//        }
+//
+//        boolean isTenantFlowStarted = false;
+//        JSONObject apiJSON;
+//        try {
+//            String tenantDomain = MultitenantUtils.getTenantDomain(APIUtil.replaceEmailDomainBack(provider));
+//            if (tenantDomain != null && !MultitenantConstants.SUPER_TENANT_DOMAIN_NAME.equals(tenantDomain)) {
+//                isTenantFlowStarted = true;
+//                PrivilegedCarbonContext.startTenantFlow();
+//                PrivilegedCarbonContext.getThreadLocalCarbonContext().setTenantDomain(tenantDomain, true);
+//            }
+//            RegistryService registryService = ServiceReferenceHolder.getInstance().getRegistryService();
+//            int tenantId;
+//            UserRegistry registry;
+//            JSONParser parser = new JSONParser();
+//            try {
+//                tenantId = ServiceReferenceHolder.getInstance().getRealmService().getTenantManager().getTenantId(tenantDomain);
+//                registry = registryService.getGovernanceSystemRegistry(tenantId);
+//
+//                apiJSON = (JSONObject) parser.parse(definitionFromSwagger20.getAPIDefinition(apiId, registry));
+//
+//                ObjectMapper mapper = new ObjectMapper().setVisibility(PropertyAccessor.FIELD,
+//                        JsonAutoDetect.Visibility.ANY);
+//                mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+//                TypeFactory typeFactory = mapper.getTypeFactory();
+//                List<WSDLSOAPOperation> soapOperations = mapper.readValue(mappingJson,
+//                        typeFactory.constructCollectionType(List.class, WSDLSOAPOperation.class));
+//
+//                RESTToSOAPMsgTemplate template = new RESTToSOAPMsgTemplate();
+//                if(apiJSON != null) {
+//                    Map pathMap = (HashMap) apiJSON.get("paths");
+//
+//                    for (Object o : pathMap.entrySet()) {
+//                        Map.Entry entry = (Map.Entry) o;
+//                        String key = (String) entry.getKey();
+//                        JSONObject resource = (JSONObject) entry.getValue();
+//
+//                        Set methods = resource.keySet();
+//                        for (Object key1 : methods) {
+//                            String soapAction = "";
+//                            String namespace = "";
+//                            List<WSDLOperationParam> inputParams = null;
+//                            String method = (String) key1;
+//
+//                            List<JSONObject> mappingList = getParameterMappingFromSwagger(apiJSON, resource, method);
+//                            for (WSDLSOAPOperation operationParam : soapOperations) {
+//                                //todo comment
+//                                if (operationParam.getName().equals(key.substring(1)) && operationParam.getHttpVerb()
+//                                        .equalsIgnoreCase(method)) {
+//                                    inputParams = operationParam.getParameters();
+//                                    soapAction = operationParam.getSoapAction();
+//                                    namespace = operationParam.getTargetNamespace();
+//                                    break;
+//                                }
+//                            }
+//                            JSONObject soapToRestParamMapping = generateSoapToRestParamMapping(inputParams,
+//                                    mappingList);
+//                            String inSequence = template
+//                                    .getMappingInSequence(soapToRestParamMapping, method, soapAction, namespace);
+//                            String outSequence = template.getMappingOutSequence();
+//                            String resourceInPath = APIConstants.API_LOCATION + RegistryConstants.PATH_SEPARATOR +
+//                                    provider + RegistryConstants.PATH_SEPARATOR + name
+//                                    + RegistryConstants.PATH_SEPARATOR + version + RegistryConstants.PATH_SEPARATOR
+//                                    + "/soap_to_rest/in" + key + "_" + method + ".xml";
+//                            String resourceOutPath = APIConstants.API_LOCATION + RegistryConstants.PATH_SEPARATOR +
+//                                    provider + RegistryConstants.PATH_SEPARATOR + name
+//                                    + RegistryConstants.PATH_SEPARATOR + version + RegistryConstants.PATH_SEPARATOR
+//                                    + "/soap_to_rest/out" + key + "_" + method + ".xml";
+//                            Resource regResource;
+//                            if (!registry.resourceExists(resourceInPath)) {
+//                                regResource = registry.newResource();
+//                            } else {
+//                                regResource = registry.get(resourceInPath);
+//                            }
+//                            regResource.setContent(inSequence);
+//                            regResource.addProperty("method", method);
+//                            regResource.setMediaType("text/xml");
+//                            registry.put(resourceInPath, regResource);
+//
+//                            if (!registry.resourceExists(resourceOutPath)) {
+//                                regResource = registry.newResource();
+//                            } else {
+//                                regResource = registry.get(resourceOutPath);
+//                            }
+//                            regResource.setContent(outSequence);
+//                            regResource.addProperty("method", method);
+//                            regResource.setMediaType("text/xml");
+//                            registry.put(resourceOutPath, regResource);
+//                        }
+//                    }
+//                }
+//            } catch (RegistryException e) {
+//                handleException("Error when create registry instance ", e);
+//            } catch (UserStoreException e) {
+//                handleException("Error while reading tenant information ", e);
+//            } catch (ParseException e) {
+//                handleException("Error while parsing json content", e);
+//            } catch (org.wso2.carbon.registry.api.RegistryException e) {
+//                handleException("Error while creating registry resource", e);
+//            } catch (IOException e) {
+//                handleException("Error occurred when parsing json string ", e);
+//            }
+//        } finally {
+//            if (isTenantFlowStarted) {
+//                PrivilegedCarbonContext.endTenantFlow();
+//            }
+//        }
+//    }
+//
+//    /**
+//     * gets parameter soap parameter mapping from the swagger json
+//     *
+//     * @param api swagger json object
+//     * @param resource json object for the resource
+//     * @param method http method
+//     * @return parameter mapping for the resource method
+//     */
+//    private static List<JSONObject> getParameterMappingFromSwagger(JSONObject api, JSONObject resource, String method) {
+//        Map content = (HashMap) resource.get(method);
+//        JSONArray parameters = (JSONArray) content.get("parameters");
+//        List<JSONObject> mappingList = new ArrayList<JSONObject>();
+//        for (Object param : parameters) {
+//            String inputType = String.valueOf(((JSONObject) param).get("in"));
+//            String name = String.valueOf(((JSONObject) param).get("name"));
+//            if(inputType.equals("body")) {
+//                JSONObject schema = (JSONObject) ((JSONObject) param).get("schema");
+//                String definitionPath = String.valueOf(schema.get("$ref"));
+//                String definition = definitionPath.replaceAll("#/definitions/","");
+//                JSONObject definitions = (JSONObject) ((JSONObject)api.get("definitions")).get(definition);
+//                JSONObject properties = (JSONObject) definitions.get("properties");
+//
+//                for (Object property : properties.entrySet()) {
+//                    Map.Entry entry = (Map.Entry) property;
+//                    String paramName = String.valueOf(entry.getKey());
+//                    JSONObject value = (JSONObject) entry.getValue();
+//                    if (value.get("$ref") != null) {
+//                        String propDefinitionRef = String.valueOf(value.get("$ref")).replaceAll("#/definitions/", "");
+//                        JSONObject propDefinitions = (JSONObject) ((JSONObject) api.get("definitions"))
+//                                .get(propDefinitionRef);
+//                        JSONObject props = (JSONObject) propDefinitions.get("properties");
+//                        JSONObject refObj = new JSONObject();
+//                        refObj.put(paramName, props);
+//                        mappingList.add(refObj);
+//                    } else if (String.valueOf(value.get("type")).equals("array")) {
+//                        JSONObject arrObj = new JSONObject();
+//                        arrObj.put(((Map.Entry) property).getKey(), ((Map.Entry) property).getValue());
+//                        mappingList.add(arrObj);
+//                    }
+//                }
+//            } else {
+//                JSONObject queryObj = new JSONObject();
+//                queryObj.put(((JSONObject) param).get("name"), param);
+//                mappingList.add(queryObj);
+//            }
+//        }
+//        return mappingList;
+//    }
+//
+//    /**
+//     * generate parameter mapping for soap operations to rest resource to be passed to the velocity templates
+//     *
+//     * @param params soap operation parameters
+//     * @param mappingList parameter mapping for the rest resources
+//     * @return soap to rest parameter mapping json
+//     */
+//    private static JSONObject generateSoapToRestParamMapping(List<WSDLOperationParam> params, List<JSONObject> mappingList) {
+//        JSONObject soapToRestParamMapping = new JSONObject();
+//        int i = mappingList.size() -1;
+//
+//        for (WSDLOperationParam param : params) {
+//            JSONObject paramObj = new JSONObject();
+//            String parameter = param.getName();
+//            String dataType = param.getDataType();
+//            if(dataType != null && !dataType.equals("array")) {
+//                paramObj.put("type", "query");
+//            }
+//            JSONObject mappingObj = mappingList.get(i);
+//            WSDLComplexType complexType = param.getWsdlComplexType();
+//            Iterator paramKeyIterator = mappingObj.keySet().iterator();
+//            String paramKey = "";
+//            if(paramKeyIterator.hasNext()){
+//                paramKey = paramKeyIterator.next().toString();
+//            }
+//            JSONObject complexTypeObj = new JSONObject();
+//            if(complexType != null) {
+//                String complexTypeName = complexType.getName();
+//                List<WSDLOperationParam> complexTypes = complexType.getParamList();
+//                List<JSONObject> complexTypeList = new ArrayList<JSONObject>();
+//                Iterator complexObjIterator = ((JSONObject)mappingObj.get(paramKey)).keySet().iterator();
+//                for (WSDLOperationParam operation : complexTypes) {
+//                    JSONObject innerParam = new JSONObject();
+//                    if(operation.isArray()) {
+//                        String jsonPath = parameter;
+//                        Map paramMap = new LinkedHashMap();
+//                        paramMap.put("type", "array");
+//                        paramMap.put(operation.getName(), jsonPath);
+//                        paramObj.putAll(paramMap);
+//                    } else if (complexObjIterator.hasNext()) {
+//                        String complexParam = complexObjIterator.next().toString();
+//                        String jsonPath = parameter + "." + complexTypeName + "." + operation.getName();
+//                        innerParam.put(complexParam, jsonPath);
+//                        complexTypeList.add(innerParam);
+//                    }
+//                }
+//                complexTypeObj.put("type", "object");
+//                complexTypeObj.put(complexTypeName, complexTypeList);
+//            }
+//            if(dataType == null) {
+//                soapToRestParamMapping.put(parameter, complexTypeObj);
+//            } else {
+//                soapToRestParamMapping.put(parameter, paramObj);
+//            }
+//            i--;
+//        }
+//        return soapToRestParamMapping;
+//    }
+//
+//    /**
+//     * gets generated synapse configs from the registry
+//     *
+//     * @param cx
+//     * @param thisObj
+//     * @param args
+//     * @param funObj
+//     * @return
+//     * @throws APIManagementException
+//     */
+//    public static NativeObject jsFunction_getRestToSoapConvertedSequence(Context cx, Scriptable thisObj,
+//            Object[] args,
+//            Function funObj) throws APIManagementException {
+//
+//        if (args == null || args.length == 0) {
+//            handleException("Invalid number of input parameters.");
+//        }
+//
+//        NativeObject resultObj = new NativeObject();
+//        NativeObject apiData = (NativeObject) args[0];
+//        String seqType = (String) args[1];
+//        String provider = String.valueOf(apiData.get("provider", apiData));
+//        String name = (String) apiData.get("apiName", apiData);
+//        String version = (String) apiData.get("version", apiData);
+//
+//        provider = (provider != null ? provider.trim() : null);
+//        name = (name != null ? name.trim() : null);
+//        version = (version != null ? version.trim() : null);
+//        APIIdentifier apiId = new APIIdentifier(provider, name, version);
+//        APIProvider apiProvider = getAPIProvider(thisObj);
+//        if (apiProvider.getAPI(apiId) == null) {
+//            return null;
+//        }
+//
+//        boolean isTenantFlowStarted = false;
+//
+//        try {
+//            String tenantDomain = MultitenantUtils.getTenantDomain(APIUtil.replaceEmailDomainBack(provider));
+//            if (tenantDomain != null && !MultitenantConstants.SUPER_TENANT_DOMAIN_NAME.equals(tenantDomain)) {
+//                isTenantFlowStarted = true;
+//                PrivilegedCarbonContext.startTenantFlow();
+//                PrivilegedCarbonContext.getThreadLocalCarbonContext().setTenantDomain(tenantDomain, true);
+//            }
+//            RegistryService registryService = ServiceReferenceHolder.getInstance().getRegistryService();
+//            int tenantId;
+//            UserRegistry registry;
+//            JSONParser parser = new JSONParser();
+//
+//            try {
+//                tenantId = ServiceReferenceHolder.getInstance().getRealmService().getTenantManager().getTenantId(tenantDomain);
+//                registry = registryService.getGovernanceSystemRegistry(tenantId);
+//                String resourcePath = APIConstants.API_LOCATION + RegistryConstants.PATH_SEPARATOR +
+//                        provider + RegistryConstants.PATH_SEPARATOR + name + RegistryConstants.PATH_SEPARATOR + version
+//                        + RegistryConstants.PATH_SEPARATOR + SOAP_TO_REST_RESOURCE + RegistryConstants.PATH_SEPARATOR + seqType;
+//
+//                Collection collection = registry.get(resourcePath, 0, Integer.MAX_VALUE);
+//                String[] resources = collection.getChildren();
+//
+//                for (String path : resources) {
+//                    Resource resource = registry.get(path);
+//                    String content = new String((byte[]) resource.getContent(), Charset.defaultCharset());
+//                    String resourceName = ((ResourceImpl) resource).getName();
+//                    resourceName = resourceName.replaceAll("\\.xml", "");
+//                    String httpMethod = resource.getProperty("method");
+//                    NativeObject resourceObj = new NativeObject();
+//                    resourceObj.put("method", resourceObj, httpMethod);
+//                    resourceObj.put("content", resourceObj, content);
+//                    resultObj.put(resourceName,resultObj, resourceObj);
+//                }
+//
+//            } catch (RegistryException e) {
+//                handleException("Error when create registry instance ", e);
+//            } catch (UserStoreException e) {
+//                handleException("Error while reading tenant information ", e);
+//            } catch (org.wso2.carbon.registry.api.RegistryException e) {
+//                handleException("Error while creating registry resource", e);
+//            }
+//        } finally {
+//            if (isTenantFlowStarted) {
+//                PrivilegedCarbonContext.endTenantFlow();
+//            }
+//        }
+//        return resultObj;
+//    }
 
     /**
      * This method is to functionality of add a new API in API-Provider

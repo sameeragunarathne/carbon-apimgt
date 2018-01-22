@@ -91,11 +91,7 @@ import org.wso2.carbon.apimgt.impl.APIConstants;
 import org.wso2.carbon.apimgt.impl.APIMRegistryServiceImpl;
 import org.wso2.carbon.apimgt.impl.APIManagerAnalyticsConfiguration;
 import org.wso2.carbon.apimgt.impl.APIManagerConfiguration;
-import org.wso2.carbon.apimgt.impl.APIMgtWSDLException;
 import org.wso2.carbon.apimgt.impl.ThrottlePolicyDeploymentManager;
-import org.wso2.carbon.apimgt.impl.WSDLOperationParam;
-import org.wso2.carbon.apimgt.impl.WSDLProcessor;
-import org.wso2.carbon.apimgt.impl.WSDLSoapOperation;
 import org.wso2.carbon.apimgt.impl.clients.ApplicationManagementServiceClient;
 import org.wso2.carbon.apimgt.impl.clients.OAuthAdminClient;
 import org.wso2.carbon.apimgt.impl.clients.UserInformationRecoveryClient;
@@ -1421,17 +1417,9 @@ public final class APIUtil {
             Resource wsdlResource = registry.newResource();
             if (!api.getWsdlUrl().matches(wsdRegistryPath)) {
                 if (isWSDL2Document(api.getWsdlUrl())) {
-                    byte[] wsdl2Content = wsdlReader.getWSDL2(api);
-                    WSDLProcessor processor = wsdlReader.getWSDLProcessor(wsdl2Content);
                     wsdlContentEle = wsdlReader.readAndCleanWsdl2(api);
                     wsdlResource.setContent(wsdlContentEle.toString());
                 } else {
-                    byte[] wsdlContent = wsdlReader.getWSDL(api);
-                    WSDLProcessor processor = wsdlReader.getWSDLProcessor(wsdlContent);
-
-                    Set<WSDLSoapOperation> operations = processor.getWsdlInfo().getSoapBindingOperations();
-                    mapSoapToRest(operations);
-
                     wsdlContentEle = wsdlReader.readAndCleanWsdl(api);
                     wsdlResource.setContent(wsdlContentEle.toString());
                 }
@@ -1475,48 +1463,6 @@ public final class APIUtil {
             String msg = "Failed to process the WSDL : " + api.getWsdlUrl();
             log.error(msg, e);
             throw new APIManagementException(msg, e);
-        } catch (APIMgtWSDLException e) {
-            String msg = "Error occurred while getting http binding operations";
-            log.error(msg, e);
-            throw new APIManagementException(msg, e);
-        }
-    }
-
-    public static String soapToRestMapping(String url) throws APIManagementException {
-        APIMWSDLReader wsdlReader = new APIMWSDLReader(url);
-        byte[] wsdlContent = wsdlReader.getWSDL();
-        WSDLProcessor processor = wsdlReader.getWSDLProcessor(wsdlContent);
-        Set<WSDLSoapOperation> operations = null;
-        try {
-            operations = processor.getWsdlInfo().getSoapBindingOperations();
-        } catch (APIMgtWSDLException e) {
-            throw new APIManagementException("Error in soap to rest conversion for wsdl url:" + url, e);
-        }
-        APIUtil.mapSoapToRest(operations);
-        String jsonResponse = new Gson().toJson(operations);
-        return jsonResponse;
-    }
-
-
-    public static void mapSoapToRest(Set<WSDLSoapOperation> soapOperations) {
-        for (WSDLSoapOperation op : soapOperations) {
-            String resourcePath;
-            String operationName = op.getName();
-            if(operationName.toLowerCase().startsWith("get")) {
-                resourcePath = operationName.substring(3, operationName.length());
-                op.setHttpVerb("GET");
-            } else {
-                resourcePath = operationName;
-                op.setHttpVerb("POST");
-            }
-            resourcePath = resourcePath.substring(0,1).toLowerCase() + resourcePath.substring(1,resourcePath.length());
-            op.setName(resourcePath);
-
-            List<WSDLOperationParam> params = op.getParameters();
-            for (WSDLOperationParam param : params) {
-                String[] parts = param.getDataType().split(":");
-                param.setDataType(parts[parts.length-1]);
-            }
         }
     }
 

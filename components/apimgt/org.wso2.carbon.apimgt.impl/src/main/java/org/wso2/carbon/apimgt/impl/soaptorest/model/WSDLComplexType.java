@@ -15,46 +15,33 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.wso2.carbon.apimgt.impl.soaptorest.model;
 
-package org.wso2.carbon.apimgt.impl;
+import org.wso2.carbon.apimgt.impl.soaptorest.model.WSDLOperationParam;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * Basic WSDL operation parameter
+ * wsdl complex type represention
  */
-public class WSDLOperationParam {
-
+public class WSDLComplexType {
     private String name;
-    private ParamTypeEnum paramType;
-    private String dataType;
-
-    /**
-     * Parameter types
-     */
-    public enum ParamTypeEnum {
-        QUERY, BODY, PATH, FORM_DATA
-    }
-
-    public String getDataType() {
-        return dataType;
-    }
+    private List<WSDLOperationParam> paramList = new ArrayList<>();
 
     public String getName() {
         return name;
-    }
-
-    public ParamTypeEnum getParamType() {
-        return paramType;
-    }
-
-    public void setDataType(String dataType) {
-        this.dataType = dataType;
     }
 
     public void setName(String name) {
         this.name = name;
     }
 
-    public void setParamType(ParamTypeEnum paramType) {
-        this.paramType = paramType;
+    public List<WSDLOperationParam> getParamList() {
+        return paramList;
+    }
+
+    public void setParamList(List<WSDLOperationParam> paramList) {
+        this.paramList = paramList;
     }
 }

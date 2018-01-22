@@ -230,8 +230,6 @@ public interface APIProvider extends APIManager {
 
     String getDefaultVersion(APIIdentifier apiid) throws APIManagementException;
 
-    void soapToRestMapping(String url) throws APIManagementException;
-
     /**
      * Adds a new API to the Store
      *
