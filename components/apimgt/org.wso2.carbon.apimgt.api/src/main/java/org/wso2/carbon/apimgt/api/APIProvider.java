@@ -249,7 +249,7 @@ public interface APIProvider extends APIManager {
      * @throws APIManagementException if failed to add API
      */
     void addAPI(API api) throws APIManagementException;
-    
+
     public boolean isAPIUpdateValid(API api) throws APIManagementException;
 
     /**
