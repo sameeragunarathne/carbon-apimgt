@@ -17,30 +17,26 @@
  */
 package org.wso2.carbon.apimgt.impl.soaptorest.model;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
- * WSDL complex type representation.
+ * WSDL simple type representation.
  */
-public class WSDLComplexType {
+public class WSDLSimpleType {
     private String name;
-    private List<WSDLOperationParam> paramList = new ArrayList<>();
+    private String type;
 
     public String getName() {
         return name;
     }
 
-
     public void setName(String name) {
         this.name = name;
     }
 
-    public List<WSDLOperationParam> getParamList() {
-        return paramList;
+    public String getType() {
+        return type;
     }
 
-    public void setParamList(List<WSDLOperationParam> paramList) {
-        this.paramList = paramList;
+    public void setType(String type) {
+        this.type = type;
     }
 }

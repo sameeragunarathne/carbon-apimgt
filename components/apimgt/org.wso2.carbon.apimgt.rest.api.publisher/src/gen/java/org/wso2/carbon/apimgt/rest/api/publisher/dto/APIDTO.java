@@ -64,7 +64,7 @@ public class APIDTO  {
   private Boolean isDefaultVersion = null;
   
   public enum TypeEnum {
-     HTTP,  WS, 
+     HTTP,  WS, SOAPTOREST
   };
   @NotNull
   private TypeEnum type = TypeEnum.HTTP;

@@ -16,6 +16,7 @@
 
 package org.wso2.carbon.apimgt.rest.api.publisher.impl;
 
+import com.google.gson.Gson;
 import org.apache.axiom.om.OMAttribute;
 import org.apache.axiom.om.OMElement;
 import org.apache.axiom.om.util.AXIOMUtil;
@@ -51,6 +52,8 @@ import org.wso2.carbon.apimgt.api.model.policy.PolicyConstants;
 import org.wso2.carbon.apimgt.impl.APIConstants;
 import org.wso2.carbon.apimgt.impl.definitions.APIDefinitionFromOpenAPISpec;
 import org.wso2.carbon.apimgt.impl.factory.KeyManagerHolder;
+import org.wso2.carbon.apimgt.impl.soaptorest.SequenceGenerator;
+import org.wso2.carbon.apimgt.impl.soaptorest.util.SOAPOperationBindingUtils;
 import org.wso2.carbon.apimgt.impl.utils.APIUtil;
 import org.wso2.carbon.apimgt.rest.api.publisher.ApisApiService;
 import org.wso2.carbon.apimgt.rest.api.publisher.dto.APIDTO;
@@ -168,6 +171,7 @@ public class ApisApiServiceImpl extends ApisApiService {
             APIProvider apiProvider = RestApiUtil.getLoggedInUserProvider();
             String username = RestApiUtil.getLoggedInUsername();
             boolean isWSAPI = APIDTO.TypeEnum.WS == body.getType();
+            boolean isSoapToRestConvertedApi = APIDTO.TypeEnum.SOAPTOREST == body.getType();
 
             // validate web socket api endpoint configurations
             if (isWSAPI) {
@@ -267,6 +271,10 @@ public class ApisApiServiceImpl extends ApisApiService {
                 RestApiUtil.handleBadRequest(
                         "Specified policy " + body.getApiLevelPolicy() + " is invalid", log);
             }
+            if (isSoapToRestConvertedApi && StringUtils.isNotBlank(body.getWsdlUri())) {
+                String swaggerStr = SOAPOperationBindingUtils.getSoapOperationMapping(body.getWsdlUri());
+                body.setApiDefinition(swaggerStr);
+            }
             API apiToAdd = APIMappingUtil.fromDTOtoAPI(body, provider);
             //Overriding some properties:
             //only allow CREATED as the stating state for the new api if not status is PROTOTYPED
@@ -279,7 +287,17 @@ public class ApisApiServiceImpl extends ApisApiService {
 
             //adding the api
             apiProvider.addAPI(apiToAdd);
-            if (!isWSAPI) {
+            if (isSoapToRestConvertedApi) {
+                if (StringUtils.isNotBlank(apiToAdd.getWsdlUrl())) {
+                    String swaggerStr = SOAPOperationBindingUtils.getSoapOperationMapping(body.getWsdlUri());
+                    apiProvider.saveSwagger20Definition(apiToAdd.getId(), swaggerStr);
+                    SequenceGenerator.generateSequencesFromSwagger(swaggerStr, new Gson().toJson(body));
+                } else {
+                    String errorMessage = "Error while generating the swagger since the wsdl url is null for: " + body.getProvider() + "-" +
+                            body.getName() + "-" + body.getVersion();
+                    RestApiUtil.handleInternalServerError(errorMessage, log);
+                }
+            } else if (!isWSAPI) {
                 apiProvider.saveSwagger20Definition(apiToAdd.getId(), body.getApiDefinition());
             }
             APIIdentifier createdApiId = apiToAdd.getId();
@@ -788,6 +806,7 @@ public class ApisApiServiceImpl extends ApisApiService {
             API apiInfo = APIMappingUtil.getAPIFromApiIdOrUUID(apiId, tenantDomain);
             APIIdentifier apiIdentifier = apiInfo.getId();
             boolean isWSAPI = APIConstants.APIType.WS == APIConstants.APIType.valueOf(apiInfo.getType());
+            boolean isSoapToRestConvertedApi = APIDTO.TypeEnum.SOAPTOREST == body.getType();
 
             //Overriding some properties:
             body.setName(apiIdentifier.getApiName());

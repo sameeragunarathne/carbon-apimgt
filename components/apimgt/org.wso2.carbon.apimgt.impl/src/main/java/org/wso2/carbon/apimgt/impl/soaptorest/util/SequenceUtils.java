@@ -17,6 +17,7 @@
  */
 package org.wso2.carbon.apimgt.impl.soaptorest.util;
 
+import org.json.JSONException;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -45,6 +46,7 @@ import org.wso2.carbon.utils.multitenancy.MultitenantUtils;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -392,6 +394,73 @@ public class SequenceUtils {
             if (log.isDebugEnabled()) {
                 log.debug("json path for definition: " + definition + " is: " + jsonPath);
             }
+        }
+    }
+
+    /**
+     * Generate json paths for the elements of a given json
+     *
+     * @param json                     json payload
+     * @param parameterJsonPathMapping map to be populated with the respective json paths
+     * @throws JSONException
+     */
+    public static void listJson(org.json.JSONObject json, Map<String, String> parameterJsonPathMapping)
+            throws JSONException {
+        listJSONObject("", json, parameterJsonPathMapping);
+    }
+
+    private static void listObject(String parent, Object data, Map<String, String> parameterJsonPathMapping)
+            throws JSONException {
+        if (data instanceof org.json.JSONObject) {
+            listJSONObject(parent, (org.json.JSONObject) data, parameterJsonPathMapping);
+        } else if (data instanceof org.json.JSONArray) {
+            listJSONArray(parent, (org.json.JSONArray) data, parameterJsonPathMapping);
+        } else {
+            listPrimitive(parent, data, parameterJsonPathMapping);
+        }
+    }
+
+    private static void listJSONObject(String parent, org.json.JSONObject json,
+            Map<String, String> parameterJsonPathMapping) throws JSONException {
+
+        Iterator it = json.keys();
+        if (!it.hasNext()) {
+            if (log.isDebugEnabled()) {
+                log.debug("JSON path of the parameter: " + parent + " and type: object");
+            }
+
+            String[] types = parent.split(",");
+            if (types.length > 1) {
+                parameterJsonPathMapping.put(types[0], types[1]);
+            } else {
+                parameterJsonPathMapping.put(types[0], "object");
+            }
+        }
+        while (it.hasNext()) {
+            String key = (String) it.next();
+            Object child = json.get(key);
+            String childKey = parent.isEmpty() ? key : parent + "." + key;
+            listObject(childKey, child, parameterJsonPathMapping);
+        }
+    }
+
+    private static void listJSONArray(String parent, org.json.JSONArray json,
+            Map<String, String> parameterJsonPathMapping) throws JSONException {
+
+        for (int i = 0; i < json.length(); i++) {
+            Object data = json.get(i);
+            listObject(parent + ",array", data, parameterJsonPathMapping);
+        }
+    }
+
+    private static void listPrimitive(String parent, Object obj, Map<String, String> parameterJsonPathMapping) {
+
+        log.debug("JSON path of the parameter: " + parent + " and type: primitive");
+        String[] types = parent.split(",");
+        if (types.length > 1) {
+            parameterJsonPathMapping.put(types[0], types[1]);
+        } else {
+            parameterJsonPathMapping.put(types[0], "simple");
         }
     }
 }

@@ -15,32 +15,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.wso2.carbon.apimgt.impl.soaptorest.model;
+package org.wso2.carbon.apimgt.impl.soaptorest.util;
 
-import java.util.ArrayList;
-import java.util.List;
+import com.google.gson.ExclusionStrategy;
+import com.google.gson.FieldAttributes;
 
-/**
- * WSDL complex type representation.
- */
-public class WSDLComplexType {
-    private String name;
-    private List<WSDLOperationParam> paramList = new ArrayList<>();
-
-    public String getName() {
-        return name;
+public class SwaggerFieldsExcludeStrategy implements ExclusionStrategy {
+    @Override
+    public boolean shouldSkipField(FieldAttributes fieldAttributes) {
+        return fieldAttributes.getName().equals("vendorExtensions");
     }
 
-
-    public void setName(String name) {
-        this.name = name;
+    @Override
+    public boolean shouldSkipClass(Class<?> aClass) {
+        return false;
     }
 
-    public List<WSDLOperationParam> getParamList() {
-        return paramList;
-    }
-
-    public void setParamList(List<WSDLOperationParam> paramList) {
-        this.paramList = paramList;
-    }
 }
